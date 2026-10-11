@@ -1,7 +1,9 @@
 {
   "name": "claude-code-mods",
-  "owner": { "name": "Spendry" },
-  "description": "Mods that change how Claude Code works and what it shows: hooks on prompts and tool calls, bands above the prompt, slash commands",
+  "owner": {
+    "name": "Spendry"
+  },
+  "description": "Mods that change how Claude Code works and what it shows: hooks on prompts and tool calls, bands above the prompt, panes, slash commands",
   "plugins": [
     {
       "name": "deviation-kernel",
@@ -17,6 +19,11 @@
       "name": "goal-board",
       "source": "./goal-board",
       "description": "Each session's goal, task progress and ETA above the prompt, and a /goals board of every running session on this machine"
+    },
+    {
+      "name": "file-tree",
+      "source": "./file-tree",
+      "description": "A file tree of the working directory in a pane beside the transcript, with folders you open and close and the files Claude just changed marked"
     }
   ]
 }

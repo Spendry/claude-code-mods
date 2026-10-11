@@ -1,0 +1,23 @@
+{
+  "name": "file-tree",
+  "version": "0.1.0",
+  "description": "A file tree of the working directory in a pane beside the transcript, with folders you open and close and the files Claude just changed marked",
+  "author": {
+    "name": "Sam"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "background": {
+      "type": "string",
+      "title": "Pane background",
+      "description": "Hex color painted behind the tree. The default is half of Windows Terminal's Dark+ background (#1E1E1E). Leave empty to keep the terminal's own background.",
+      "default": "#0f0f0f"
+    },
+    "coverFrame": {
+      "type": "boolean",
+      "title": "Draw over the pane's frame",
+      "description": "Draws the orange border on top of Claude Code's square pane frame instead of just inside it. Turn off if the border goes missing or covers something.",
+      "default": true
+    }
+  }
+}

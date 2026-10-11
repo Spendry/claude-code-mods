@@ -2,13 +2,14 @@
 
 > Part of my [portfolio](https://github.com/Spendry/portfolio).
 
-Mods for [Claude Code](https://claude.com/claude-code) that change what it does and what it shows. Each one is a hooks module: it runs inside Claude Code, hooks prompts, tool calls and turns, and draws a line above the prompt. The three here are **deviation-kernel**, **cache-meter** and **goal-board**. All three ship with tests that run without a live session.
+Mods for [Claude Code](https://claude.com/claude-code) that change what it does and what it shows. Each one is a hooks module: it runs inside Claude Code, hooks prompts, tool calls and turns, and draws a line above the prompt or a pane beside the transcript. The four here are **deviation-kernel**, **cache-meter**, **goal-board** and **file-tree**. All four ship with tests that run without a live session.
 
 | Mod | What it does | Costs anything? |
 |---|---|---|
 | [deviation-kernel](deviation-kernel/) | Keeps the assumptions your project refuses in Claude's system prompt on every request, and catches an edit that brings one back at the step where it lands. | One small Haiku call after each long answer (can be switched off) |
 | [cache-meter](cache-meter/) | Shows how long the prompt cache stays warm, what a miss would cost to rewrite, how full the context is, and the session's cost at API rates. | No |
 | [goal-board](goal-board/) | Shows each session's goal, task progress and ETA, and `/goals` lists every running session on the machine. | No |
+| [file-tree](file-tree/) | Shows the working directory as a file tree in a pane on the right, with folders you open and close and the files Claude just changed marked. | No |
 
 Install any one of them on its own.
 
@@ -36,7 +37,7 @@ Claude runs the install. It can't decide your project's refusals or see the band
 - **Pick the mods.** Each one changes how sessions behave. Read its section below before turning it on.
 - **Decide what your project refuses.** deviation-kernel is only as good as its `KERNEL.md`. Claude can help you word a refusal and suggest tells, but which assumptions to refuse is your design decision. Start with two or three. You can add more later with `/kernel add`.
 - **Check the tells after a few days.** A tell that fires on harmless text wastes your attention. A refusal with no tell at all goes unguarded at the edit step. `/kernel log` shows what tripped and what you decided.
-- **Look at it in a terminal.** The bands draw in a terminal session and in the Claude desktop app's Code tab. In the VS Code extension's chat panel the hooks still run (the kernel still guards edits) but nothing draws above the prompt, and `/goals` and `/cache` answer in text instead.
+- **Look at it in a terminal.** The bands and panes draw in a terminal session and in the Claude desktop app's Code tab. In the VS Code extension's chat panel the hooks still run (the kernel still guards edits) but nothing draws above the prompt, and `/goals` and `/cache` answer in text instead.
 - **Keep cache-meter's prices current.** They are typed into `cache-meter/hooks/register.ts` with the date they were checked. A model not in the table is priced at the first row's rates and shown with `≈`.
 
 ## Install by hand
@@ -47,6 +48,7 @@ At the prompt of a Claude Code terminal session, one line per mod:
 /plugin install deviation-kernel --marketplace Spendry/claude-code-mods
 /plugin install cache-meter --marketplace Spendry/claude-code-mods
 /plugin install goal-board --marketplace Spendry/claude-code-mods
+/plugin install file-tree --marketplace Spendry/claude-code-mods
 ```
 
 Answer `y` to add the marketplace, then pick the user scope so the mod loads in every session. A mod with options shows a screen to set them. `/plugin` lists what's active.
@@ -105,11 +107,40 @@ What it guarantees: each session shows its goal, task progress and ETA, and one 
 - `/goals` opens the board of all sessions: working, idle or done, the current task, and the ETA.
 - Sessions share one store on your machine, and each writes only its own record. A session that ends with all its tasks done stays on the board as done. Any other session drops off when it ends. Every record is cleared after 12 hours idle. Nothing leaves your machine.
 
+## file-tree
+
+What it guarantees: you can see the project's files while Claude works on them, and which ones it has changed this session.
+
+```
+╭──────────────────────────────────────────╮
+│ work     ‹ up  home  refresh  collapse   │
+│ ──────────────────────────────────────── │
+│ ├─ ▸ notes                               │
+│ └─ ▾ relay · here                        │
+│    ├─ ▾ src                              │
+│    │  ├─ ● main.ts                       │
+│    │  └─   util.ts                       │
+│    └─   README.md                        │
+│                                          │
+│ 1 changed · 1 up from relay              │
+╰──────────────────────────────────────────╯
+```
+
+- The pane opens beside the transcript when the session starts, in the fullscreen layout on a terminal 144 columns or wider. Below that, or on the main screen, `/files` opens it (above the prompt on the main screen). `/files` again closes it.
+- Click a folder, or Tab to it and press Enter, to open or close it. With the pane focused, `r` refreshes and `c` collapses every folder.
+- `‹ up` (or `u`) moves the tree's root up one folder per press, like `cd ..`, until it reaches the drive or filesystem root. The working folder stays open under its parent and is marked `· here`. `home` (or `h`) puts the root back on the working folder. Only the view moves; Claude's working directory stays where it was.
+- It's kept dark so it stays behind the conversation: a muted orange rounded border on a darker background, every name dimmed, and only changed files in (dim) green.
+- **Options.** `background` is the hex color painted behind the tree; the default `#0f0f0f` is half of Windows Terminal's Dark+ background. Set it to half of your own terminal's background, or leave it empty to keep the terminal's. `coverFrame` (on by default) draws the orange border over Claude Code's own square pane frame, so the side facing the conversation is orange; Claude Code still shows its thin grey line along the top. Turn it off to draw the border just inside the frame instead.
+- Long names and paths are cut to fit the pane with `…`: a file or folder name keeps its start, the path in the footer keeps its end.
+- A file Claude wrote or edited this session shows a green `●`. A folder holding one has its name in green, so a change inside a closed folder still shows.
+- The tree refreshes after every Write, Edit, NotebookEdit, Bash or PowerShell call. A change made outside Claude shows on the next refresh.
+- `.git`, `node_modules`, `__pycache__`, `.venv`, `venv` and `.next` are left out. A tree is cut at 1,500 rows; close a folder to see the rest.
+
 ---
 
 ## Working on the mods
 
-Each mod is a folder with `.claude-plugin/plugin.json`, `hooks/hooks.json`, `hooks/register.ts` and `tests/`. The marketplace file at `.claude-plugin/marketplace.json` lists them.
+Each mod is a folder with `.claude-plugin/plugin.json`, `hooks/hooks.json`, `hooks/register.ts` (or `.tsx` for a mod that draws a pane) and `tests/`. The marketplace file at `.claude-plugin/marketplace.json` lists them.
 
 - `claude plugin validate <mod folder>` reports what the mod hooks and calls, and anything the engine would refuse.
 - `claude plugin test <mod folder>` runs its tests without a session.
