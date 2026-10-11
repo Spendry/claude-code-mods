@@ -116,3 +116,7 @@ Each mod is a folder with `.claude-plugin/plugin.json`, `hooks/hooks.json`, `hoo
 - To work on a clone, add the clone as a marketplace (`claude plugin marketplace add <path to clone>`) and install from it. A folder marketplace is read from the folder itself, so after an edit `/reload-plugins` picks up the change with no reinstall.
 
 A new mod is a new folder plus one entry in `marketplace.json`.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
