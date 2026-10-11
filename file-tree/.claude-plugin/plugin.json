@@ -18,6 +18,12 @@
       "title": "Draw over the pane's frame",
       "description": "Draws the orange border on top of Claude Code's square pane frame instead of just inside it. Turn off if the border goes missing or covers something.",
       "default": true
+    },
+    "duel": {
+      "type": "boolean",
+      "title": "Stick-figure duel",
+      "description": "Two small stick figures fence at the bottom of the pane, above the footer. Turn off for a still pane.",
+      "default": true
     }
   }
 }

@@ -2,6 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { Engine, FsEntry, Register } from 'claude-code'
 
 import type { Changed } from '../types'
+import { advance, beatCells, createPlayer, DUEL_ROWS, parseColor } from './duel'
 
 const PANE = 'file-tree'
 const SKIP = new Set(['.git', 'node_modules', '__pycache__', '.venv', 'venv', '.next', '.DS_Store', 'Thumbs.db'])
@@ -10,6 +11,8 @@ const WRITERS = new Set(['Write', 'Edit', 'NotebookEdit', 'Bash', 'PowerShell'])
 // Rows past this are not listed, so a huge opened folder cannot stall a draw.
 const MAX_ROWS = 1500
 const KEEP_CHANGED = 50
+// The duel's frame time: slow enough to stay in the corner of the eye.
+const DUEL_MS = 250
 
 // Every path the mod keeps is absolute with '/' separators, so the tree's root can move above the working folder.
 const expanded = atom({ plugin: 'file-tree', key: 'expanded' } as const, [])
@@ -127,9 +130,15 @@ async function toggle($: Engine) {
 }
 
 export const register: Register = (on, options) => {
-  const configured = (options as { background?: string; coverFrame?: boolean }) ?? {}
+  const configured = (options as { background?: string; coverFrame?: boolean; duel?: boolean }) ?? {}
   const background = configured.background?.trim() || undefined
   const coverFrame = configured.coverFrame !== false
+  const isDuelOn = configured.duel !== false
+  const duelBackground = parseColor(background)
+  // Animation bookkeeping only; a reload starting these over just restarts the fight.
+  const player = createPlayer()
+  let isWorking = false
+  let duelColumns = 0
 
   on('session.start', async ($, e, next) => {
     await $.command.register({
@@ -137,7 +146,31 @@ export const register: Register = (on, options) => {
       description: 'Show or hide the file tree pane',
     })
     void $.ui.open({ id: PANE, title: 'Files' })
+    if (isDuelOn) {
+      // Repaints only the duel's cells; the tree is not drawn again. A blit with nothing mounted is refused, harmlessly.
+      $.clock.every(DUEL_MS, () => {
+        const beat = advance(player, isWorking ? 'fight' : 'calm')
+        if (duelColumns > 0)
+          void $.ui.blit({ requestId: PANE, key: 'duel', cells: beatCells(beat, duelColumns, duelBackground) }).catch(() => {})
+      })
+    }
 
+    return next(e)
+  })
+
+  // The duel fences while Claude works and meditates between turns.
+  on('turn.start', async ($, e, next) => {
+    isWorking = true
+    return next(e)
+  })
+
+  on('turn.complete', async ($, e, next) => {
+    isWorking = false
+    return next(e)
+  })
+
+  on('turn.abort', async ($, e, next) => {
+    isWorking = false
     return next(e)
   })
 
@@ -276,6 +309,11 @@ export const register: Register = (on, options) => {
         })}
         {rows.length >= MAX_ROWS && <Text color="subtle" dimColor italic>more not listed; close a folder</Text>}
         <Box flexGrow={1} />
+        {isDuelOn && e.surface === 'terminal' && inner >= 20 && (() => {
+          const { Raster } = $.ui.resolve(e)
+          duelColumns = inner
+          return <Raster key="duel" columns={inner} rows={DUEL_ROWS} cells={beatCells(player.beat, inner, duelBackground)} />
+        })()}
         <Text color="subtle" dimColor italic>
           {fit(count, inner)}
           {fit(where, inner - count.length, 'tail')}

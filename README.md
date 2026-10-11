@@ -134,6 +134,7 @@ What it guarantees: you can see the project's files while Claude works on them, 
 - Long names and paths are cut to fit the pane with `…`: a file or folder name keeps its start, the path in the footer keeps its end.
 - A file Claude wrote or edited this session shows a green `●`. A folder holding one has its name in green, so a change inside a closed folder still shows.
 - The tree refreshes after every Write, Edit, NotebookEdit, Bash or PowerShell call. A change made outside Claude shows on the next refresh.
+- **The duel.** At the bottom of the pane, above the footer, two small stick figures fence while Claude is working and meditate while it waits. The animation is a set of short clips (approach, lunge, exchange, feint, a win for either side; breathing and an aura while seated; disengage, bow and kneel, and rise between the two). Each clip ends on the resting frame of its stance, so the next one, picked at random from those that start there, joins on without a jump. It repaints only its own cells four times a second and hides when the pane is too narrow. Turn it off with the `duel` option.
 - `.git`, `node_modules`, `__pycache__`, `.venv`, `venv` and `.next` are left out. A tree is cut at 1,500 rows; close a folder to see the rest.
 
 ---
