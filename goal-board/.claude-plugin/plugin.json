@@ -1,0 +1,6 @@
+{
+  "name": "goal-board",
+  "version": "0.1.0",
+  "description": "Each session's goal, task progress and ETA above the prompt, and a /goals board of every running session on this machine",
+  "author": { "name": "Sam" }
+}

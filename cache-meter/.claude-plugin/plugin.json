@@ -1,0 +1,21 @@
+{
+  "name": "cache-meter",
+  "version": "0.1.0",
+  "description": "Shows above the prompt how warm the prompt cache is, what a cache miss would cost to rewrite, context fill, and the session's API-rate cost",
+  "author": { "name": "Sam" },
+  "userConfig": {
+    "cacheTtl": {
+      "type": "string",
+      "title": "Prompt cache lifetime",
+      "description": "How long a cached prefix lives after its last use. auto assumes 5m until a cache read after more than five idle minutes shows the one-hour cache, then remembers 1h. Pick 5m or 1h to fix it.",
+      "default": "auto",
+      "options": ["auto", "5m", "1h"]
+    },
+    "warnBeforeExpiry": {
+      "type": "boolean",
+      "title": "Warn before the cache goes cold",
+      "description": "A toast one minute before expiry while you're idle, with the rewrite cost.",
+      "default": true
+    }
+  }
+}

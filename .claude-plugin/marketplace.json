@@ -1,0 +1,22 @@
+{
+  "name": "claude-code-mods",
+  "owner": { "name": "Spendry" },
+  "description": "Mods that change how Claude Code works and what it shows: hooks on prompts and tool calls, bands above the prompt, slash commands",
+  "plugins": [
+    {
+      "name": "deviation-kernel",
+      "source": "./deviation-kernel",
+      "description": "Holds a project's refused assumptions in Claude's system prompt, flags edits and answers that re-impose them, and pauses on the step where it happens"
+    },
+    {
+      "name": "cache-meter",
+      "source": "./cache-meter",
+      "description": "Shows above the prompt how warm the prompt cache is, what a cache miss would cost to rewrite, context fill, and the session's API-rate cost"
+    },
+    {
+      "name": "goal-board",
+      "source": "./goal-board",
+      "description": "Each session's goal, task progress and ETA above the prompt, and a /goals board of every running session on this machine"
+    }
+  ]
+}

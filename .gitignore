@@ -1,0 +1,17 @@
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Temp
+*.tmp
+*.log
+
+# Working reports, not part of the repo
+prose-gate-report.md
+
+# Type files Claude Code writes into each mod when it loads it
+*/.claude-plugin/types/

@@ -1,0 +1,22 @@
+{
+  "name": "deviation-kernel",
+  "version": "0.1.0",
+  "description": "Holds a project's refused assumptions in Claude's system prompt, flags edits and answers that re-impose them, and pauses on the step where it happens",
+  "author": { "name": "Sam" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "mode": {
+      "type": "string",
+      "title": "On a tripped refusal in an edit",
+      "description": "ask: hold the edit and ask you. warn: let it through and flag it to Claude. block: refuse the edit.",
+      "default": "ask",
+      "options": ["ask", "warn", "block"]
+    },
+    "semanticCheck": {
+      "type": "boolean",
+      "title": "Semantic drift check",
+      "description": "After each answer, a small model reads it against the kernel and flags conventional fillers the keyword tells miss.",
+      "default": true
+    }
+  }
+}
