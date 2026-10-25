@@ -24,6 +24,11 @@
       "name": "file-tree",
       "source": "./file-tree",
       "description": "A file tree of the working directory in a pane beside the transcript, with folders you open and close and the files Claude just changed marked"
+    },
+    {
+      "name": "idea-agents",
+      "source": "./idea-agents",
+      "description": "Six exploration agents per project (three that explore ideas, a lazy trogg for each), one ideas/ folder per run, and a guide for Claude on running a round"
     }
   ]
 }

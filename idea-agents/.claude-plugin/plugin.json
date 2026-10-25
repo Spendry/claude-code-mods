@@ -1,0 +1,14 @@
+{
+  "name": "idea-agents",
+  "version": "0.1.0",
+  "description": "Six exploration agents per project (premise-breaker, field-crosser, idea-sizer, and a lazy trogg for each), one ideas/ folder per run, and a guide in Claude's system prompt for running a round",
+  "author": { "name": "Sam" },
+  "userConfig": {
+    "offer": {
+      "type": "boolean",
+      "title": "Offer the agents",
+      "description": "On the first prompt in a project without the six agents, ask whether to install them. Home folders and folders you said never for are skipped. /ideas install works either way.",
+      "default": true
+    }
+  }
+}

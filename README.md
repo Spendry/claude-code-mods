@@ -2,7 +2,7 @@
 
 > Part of my [portfolio](https://github.com/Spendry/portfolio).
 
-Mods for [Claude Code](https://claude.com/claude-code) that change what it does and what it shows. Each one is a hooks module: it runs inside Claude Code, hooks prompts, tool calls and turns, and draws a line above the prompt or a pane beside the transcript. The four here are **deviation-kernel**, **cache-meter**, **goal-board** and **file-tree**. All four ship with tests that run without a live session.
+Mods for [Claude Code](https://claude.com/claude-code) that change what it does and what it shows. Each one is a hooks module: it runs inside Claude Code, hooks prompts, tool calls and turns, and draws a line above the prompt or a pane beside the transcript. The five here are **deviation-kernel**, **cache-meter**, **goal-board**, **file-tree** and **idea-agents**. All five ship with tests that run without a live session.
 
 | Mod | What it does | Costs anything? |
 |---|---|---|
@@ -10,6 +10,7 @@ Mods for [Claude Code](https://claude.com/claude-code) that change what it does 
 | [cache-meter](cache-meter/) | Shows how long the prompt cache stays warm, what a miss would cost to rewrite, how full the context is, and the session's cost at API rates. | No |
 | [goal-board](goal-board/) | Shows each session's goal, task progress and ETA, and `/goals` lists every running session on the machine. | No |
 | [file-tree](file-tree/) | Shows the working directory as a file tree in a pane on the right, with folders you open and close and the files Claude just changed marked. | No |
+| [idea-agents](idea-agents/) | Gives a project six exploration agents (three that explore ideas, a lazy "trogg" for each) and one `ideas/` folder per run, and tells Claude how to run a round. | Only when you run a round: the agents' own model use (the troggs run on Haiku) |
 
 Install any one of them on its own.
 
@@ -36,6 +37,7 @@ Claude runs the install. It can't decide your project's refusals or see the band
 
 - **Pick the mods.** Each one changes how sessions behave. Read its section below before turning it on.
 - **Decide what your project refuses.** deviation-kernel is only as good as its `KERNEL.md`. Claude can help you word a refusal and suggest tells, but which assumptions to refuse is your design decision. Start with two or three. You can add more later with `/kernel add`.
+- **Exempt your idea notes.** Notes that weigh a refused assumption have to name it. List their folders under `## Exempt` in `KERNEL.md` (for example `- ideas/**`) so the guard skips them; code everywhere else stays checked.
 - **Check the tells after a few days.** A tell that fires on harmless text wastes your attention. A refusal with no tell at all goes unguarded at the edit step. `/kernel log` shows what tripped and what you decided.
 - **Look at it in a terminal.** The bands and panes draw in a terminal session and in the Claude desktop app's Code tab. In the VS Code extension's chat panel the hooks still run (the kernel still guards edits) but nothing draws above the prompt, and `/goals` and `/cache` answer in text instead.
 - **Keep cache-meter's prices current.** They are typed into `cache-meter/hooks/register.ts` with the date they were checked. A model not in the table is priced at the first row's rates and shown with `≈`.
@@ -49,6 +51,7 @@ At the prompt of a Claude Code terminal session, one line per mod:
 /plugin install cache-meter --marketplace Spendry/claude-code-mods
 /plugin install goal-board --marketplace Spendry/claude-code-mods
 /plugin install file-tree --marketplace Spendry/claude-code-mods
+/plugin install idea-agents --marketplace Spendry/claude-code-mods
 ```
 
 Answer `y` to add the marketplace, then pick the user scope so the mod loads in every session. A mod with options shows a screen to set them. `/plugin` lists what's active.
@@ -70,6 +73,8 @@ The problem it answers: a design that refuses a standard assumption tends to los
 ```
 - R1: one global clock paces every stage | tells: global clock, clock tree, /clk_?en/ | instead: each stage hands off by local request/acknowledge
 ```
+
+In a folder with no kernel, the first prompt you type there asks whether Claude should help you write one: now, after that message, not this session, or never in that folder. Mid-project, Claude reads the project's own record first so its questions point at what you set out to do, then asks you for the refusals (it proposes none of its own) and writes `KERNEL.md` only when you say so. Your home folder is never asked. Turn the offer off with the `offerKernel` option.
 
 **What happens.**
 
@@ -136,6 +141,17 @@ What it guarantees: you can see the project's files while Claude works on them, 
 - The tree refreshes after every Write, Edit, NotebookEdit, Bash or PowerShell call. A change made outside Claude shows on the next refresh.
 - **The duel.** At the bottom of the pane, above the footer, two small stick figures fence while Claude is working and meditate while it waits. The animation is a set of short clips (approach, lunge, exchange, feint, a win for either side; breathing and an aura while seated; disengage, bow and kneel, and rise between the two). Each clip ends on the resting frame of its stance, so the next one, picked at random from those that start there, joins on without a jump. It repaints only its own cells four times a second and hides when the pane is too narrow. Turn it off with the `duel` option.
 - `.git`, `node_modules`, `__pycache__`, `.venv`, `venv` and `.next` are left out. A tree is cut at 1,500 rows; close a folder to see the rest.
+
+## idea-agents
+
+What it guarantees: a project can get a second set of eyes on a stuck problem, from agents that propose and size ideas but never touch its code, with every run kept in its own folder you can read later.
+
+- **The six.** `premise-breaker` lists the assumptions under a problem and flips each one. `field-crosser` brings mechanisms from other fields, at least half outside computing. `idea-sizer` checks the ideas against numbers the project already measured and gives each a kill test. Each has a lazy helper on Haiku, a "trogg": **Skip** asks "why do it at all?", **Borrow** "what already does this?", **Poke** "what's the dumbest quick try?". The upper agents read their trogg's note and say in one line what they took.
+- **The offer.** On your first typed prompt in a project without them, it asks once whether to install them into `.claude/agents/`. It never overwrites an agent the project already has. Then it asks whether Claude should tailor them to the project (its building blocks, gates, results files); Claude shows each change and writes it only when you say so. Home folders and folders you said never for are skipped.
+- **One folder per run.** `/ideas new <topic>` makes `ideas/<date>-<nn>-<topic>/` with a run card (`README.md`: question, read order, outcome, decisions) and `0-data.md` to fill. The agents write `1-premises.md`, `2-fields.md`, `3-sizing.md` and their lazy notes next to it; the main session writes `4-result.md`.
+- **The guide.** Where the agents are installed, Claude carries a short guide for running a round: who runs when, that the main session runs the troggs (subagents can't start subagents), that a gate's bar never moves, and that held-out data is scored once.
+- `/ideas` shows what's installed and the latest run. `/ideas install` adds missing agents. `/ideas tailor` starts the tailoring.
+- New agent files load as agent types at the next session start. Until then Claude runs them through the general-purpose agent.
 
 ---
 
