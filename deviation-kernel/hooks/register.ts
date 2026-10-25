@@ -20,17 +20,23 @@ What this project refuses on purpose. Everything not listed here is allowed to b
 
 ## Keeps conventional
 - <parts you are happy to build the normal way: build system, logging, test harness, file formats>
+
+## Exempt
+- <optional: paths where notes name refused assumptions to weigh them, e.g. ideas/**; edits there skip the tell check>
 `
 
 // ---------- parsing ----------
 
-type Parsed = { project: string; refusals: Refusal[]; keeps: string[] }
+// exempt: paths where notes may name refused assumptions in order to weigh them
+// (idea notes, design reviews). Edits there skip the tell check.
+type Parsed = { project: string; refusals: Refusal[]; keeps: string[]; exempt: string[] }
 
 function parseKernel(text: string): Parsed {
   let project = 'project'
   let section = ''
   const refusals: Refusal[] = []
   const keeps: string[] = []
+  const exempt: string[] = []
 
   for (const raw of text.split('\n')) {
     const line = raw.trim()
@@ -45,6 +51,10 @@ function parseKernel(text: string): Parsed {
     }
     if (/^#+\s*keep/i.test(line)) {
       section = 'keeps'
+      continue
+    }
+    if (/^#+\s*exempt/i.test(line)) {
+      section = 'exempt'
       continue
     }
     if (/^#+\s/.test(line)) {
@@ -66,9 +76,45 @@ function parseKernel(text: string): Parsed {
       continue
     }
     if (section === 'keeps' && /^[-*]\s+/.test(line)) keeps.push(line.replace(/^[-*]\s+/, ''))
+    if (section === 'exempt' && /^[-*]\s+/.test(line)) {
+      // the path pattern is the line's first token, `backticks` optional; the rest is a reason
+      const glob = line.replace(/^[-*]\s+/, '').trim().split(/\s+/)[0]!.replace(/^`|`$/g, '')
+      if (glob && !glob.startsWith('<')) exempt.push(glob)
+    }
   }
 
-  return { project, refusals, keeps }
+  return { project, refusals, keeps, exempt }
+}
+
+// A path pattern, relative to the project: ** any depth, * within one folder, ? one character.
+// A pattern ending in / covers everything under it.
+function globPattern(glob: string): RegExp {
+  let g = glob.replaceAll('\\', '/').replace(/^\.\//, '')
+  if (g.endsWith('/')) g += '**'
+  let re = ''
+  for (let i = 0; i < g.length; i++) {
+    const c = g[i]!
+    if (c === '*' && g[i + 1] === '*') {
+      if (g[i + 2] === '/') {
+        re += '(?:.*/)?' // "**/" : zero or more folders
+        i += 2
+      } else {
+        re += '.*'
+        i += 1
+      }
+    } else if (c === '*') re += '[^/]*'
+    else if (c === '?') re += '[^/]'
+    else re += c.replace(/[.+^${}()|[\]\\]/g, '\\$&')
+  }
+  return new RegExp(`^${re}$`, 'i')
+}
+
+function isExempt(path: string, cwd: string): boolean {
+  if (!parsed.exempt.length) return false
+  const p = path.replaceAll('\\', '/')
+  const root = cwd.replaceAll('\\', '/').replace(/\/+$/, '') + '/'
+  const rel = p.toLowerCase().startsWith(root.toLowerCase()) ? p.slice(root.length) : p.replace(/^\.\//, '')
+  return parsed.exempt.some(g => globPattern(g).test(rel))
 }
 
 function tellPattern(tell: string): RegExp | null {
@@ -82,11 +128,37 @@ function tellPattern(tell: string): RegExp | null {
   }
 }
 
+// ---------- explaining a trip: how the matched text goes against the kernel ----------
+
+const bare = (s: string) => s.trim().replace(/[.;:,\s]+$/, '')
+const firstSentence = (s: string) => bare(s.split(/(?<=[.!?])\s+/)[0] ?? s)
+
+// The words around the match, on its own line, so the reader sees what tripped and where.
+function snippet(text: string, re: RegExp): string {
+  const m = new RegExp(re.source, re.flags.replace('g', '')).exec(text)
+  if (!m) return ''
+  const start = text.lastIndexOf('\n', m.index) + 1
+  const end = text.indexOf('\n', m.index + m[0].length)
+  let line = text.slice(start, end < 0 ? undefined : end).trim().replace(/\s+/g, ' ')
+  if (line.length > 90) {
+    const at = Math.max(0, line.toLowerCase().indexOf(m[0].toLowerCase()) - 30)
+    line = (at > 0 ? '…' : '') + line.slice(at, at + 90) + (at + 90 < line.length ? '…' : '')
+  }
+  return line
+}
+
+/** Two sentences at most: what the edit adds and which refused assumption it marks, then what the design does instead. */
+function explain(refusal: Refusal, tell: string, text: string, re: RegExp): string {
+  const s = snippet(text, re)
+  const one = `The edit adds ${s ? `"${s}", where ` : ''}"${tell}" marks ${refusal.id}'s refused assumption: ${bare(refusal.assumption)}.`
+  return refusal.instead ? `${one} This design does otherwise: ${firstSentence(refusal.instead)}.` : one
+}
+
 // ---------- module state (rebuilt from disk on every reload) ----------
 
 let kernelPath = ''
 let mtime = -1
-let parsed: Parsed = { project: 'project', refusals: [], keeps: [] }
+let parsed: Parsed = { project: 'project', refusals: [], keeps: [], exempt: [] }
 let patterns: { refusal: Refusal; tell: string; re: RegExp }[] = []
 let section = ''
 let modeOverride: Mode | undefined
@@ -103,12 +175,13 @@ function renderSection(p: Parsed): string {
     })
     .join('\n')
   const keeps = p.keeps.length ? `\nKept conventional on purpose: ${p.keeps.join('; ')}.` : ''
+  const exempt = p.exempt.length ? `\nExempt from the edit check (notes there may name refused assumptions to weigh them): ${p.exempt.join(', ')}. Code there is still held to the kernel.` : ''
 
   return `<deviation_kernel project="${p.project}">
 This project carries a deviation kernel: assumptions it refuses on purpose. Its value depends on these refusals holding while the build fills in ordinary parts, and the usual failure is quiet: a standard component slips in and brings a refused assumption with it.
 
 Refuses:
-${refusals}${keeps}
+${refusals}${keeps}${exempt}
 
 How to work under it:
 - Name each slot by what it must guarantee and what crosses its boundary before naming its category. A category name pulls in its standard filler before any search runs.
@@ -138,7 +211,7 @@ async function loadKernel($: any, force = false): Promise<boolean> {
   }
   if (!found) {
     kernelPath = ''
-    parsed = { project: 'project', refusals: [], keeps: [] }
+    parsed = { project: 'project', refusals: [], keeps: [], exempt: [] }
     patterns = []
     section = ''
     await update($, summary, () => null)
@@ -174,11 +247,75 @@ async function addPending($: any, flags: Flag[]) {
   await update($, pending, list => [...list, ...flags].slice(-8))
 }
 
+// ---------- no kernel here: offer, once per folder, to help write one ----------
+
+const OFFER = { now: 'Yes, now', after: 'After this message', later: 'Not this session', never: 'Never in this folder' }
+
+let offer = true
+// Folders already offered this session. A reload asks again; /clear does not.
+const offered = new Set<string>()
+
+function folderKey(path: string): string {
+  return path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase()
+}
+
+function interview(lead: string): string {
+  return `[deviation-kernel] ${lead}
+
+How to run it:
+- The folder may already hold work. If it does, read its own record first (README, design notes, the earliest docs or commits) so your questions can point at what the project set out to do. Use what you find to ask, not to answer.
+- Ask the user, one question at a time, which assumptions this project refuses on purpose: ones the standard approach makes and this design rejects. The refusals come from them. Do not propose any of your own.
+- For each refusal they give, help word it, propose tells (words, phrases or /regex/ that would show up in an edit that brings the assumption back) and an "instead:" (what the design does in its place). Two or three refusals are enough to start; /kernel add takes more later.
+- Ask what the project keeps conventional on purpose.
+- Show the whole file in this form, and write it as KERNEL.md at the folder root only when the user says so:
+
+${TEMPLATE}
+- Once it is written, say in one line each what the modes do (ask holds a tripped edit for their decision, warn lets it through and flags it, block refuses it), that the mode is ${mode()}, and that /kernel mode changes it. Say too that tells only check what an edit brings in, not what the files already hold, and offer to read the existing work against the new refusals.`
+}
+
+// Resolves to a note for Claude when the user takes the offer, or undefined.
+async function kernelOffer($: any, e: { command?: unknown; isMeta?: true; origin: { kind: string } }): Promise<string | undefined> {
+  // Only a prompt the user typed; a slash command (/kernel init among them) runs as asked.
+  if (!offer || e.command || e.isMeta || (e.origin.kind !== 'composer' && e.origin.kind !== 'bridge')) return undefined
+  const cwd = await $.session.cwd()
+  const key = folderKey(cwd)
+  if (offered.has(key)) return undefined
+  offered.add(key)
+  // A home folder is where sessions start, not a project.
+  const homes = [await $.env.get('HOME'), await $.env.get('USERPROFILE')].filter(Boolean).map(folderKey)
+  if (homes.includes(key) || (await $.store.get(`never:${key}`))) return undefined
+
+  const folder = cwd.split(/[\\/]/).filter(Boolean).pop() ?? cwd
+  let answer = OFFER.later
+  try {
+    answer = await $.ui.ask(`There's no KERNEL.md in ${folder}. Want Claude to help you write one?`, {
+      header: 'Kernel',
+      options: [OFFER.now, OFFER.after, OFFER.later, OFFER.never],
+    })
+  } catch {
+    // dismissed, or nobody to ask (claude -p): leave it for this session
+  }
+
+  if (answer === OFFER.now)
+    return interview(`This folder has no KERNEL.md, and the user just chose to have you help write one. Do that before working on their message, and come back to the message once the file is written or they stop.`)
+  if (answer === OFFER.after)
+    return interview(`This folder has no KERNEL.md, and the user chose to have you help write one after this message. Answer their message first, then start.`)
+  if (answer === OFFER.never) {
+    await $.store.set(`never:${key}`, true)
+    $.ui.toast(`kernel: no more offers in ${folder}. /kernel init still works.`)
+    return undefined
+  }
+  if (answer !== OFFER.later && answer.trim())
+    return interview(`This folder has no KERNEL.md. Offered help writing one, the user answered: "${answer.trim()}". Go by that answer; if it asks for the help, run it as below.`)
+  return undefined
+}
+
 
 export const register: Register = (on, options) => {
-  const configured = (options as { mode?: Mode; semanticCheck?: boolean }) ?? {}
+  const configured = (options as { mode?: Mode; semanticCheck?: boolean; offerKernel?: boolean }) ?? {}
   configuredMode = configured.mode ?? 'ask'
   semantic = configured.semanticCheck !== false
+  offer = configured.offerKernel !== false
 
   // ---------- session ----------
 
@@ -214,10 +351,13 @@ export const register: Register = (on, options) => {
     return { sections: [...composed.sections, { id: 'deviation-kernel:kernel', text: section, scope: 'session' as const }] }
   })
 
-  // ---------- your prompt: refresh the kernel, deliver flagged drift ----------
+  // ---------- your prompt: refresh the kernel, deliver flagged drift, or offer one ----------
 
   on('prompt.submit', async ($, e, next) => {
-    await loadKernel($)
+    if (!(await loadKernel($))) {
+      const note = await kernelOffer($, e)
+      return next(note ? { ...e, context: [...(e.context ?? []), note] } : e)
+    }
     const flags = await read($, pending)
     if (!flags.length) return next(e)
 
@@ -229,23 +369,29 @@ export const register: Register = (on, options) => {
 
     const note = `[deviation-kernel] A check of the work since your last answer found places that may re-impose refused assumptions:\n${lines.join('\n')}\nDeal with these before building further on that work. If a flag is wrong, say so in one line and continue.`
     return next({ ...e, context: [...(e.context ?? []), note] })
-  })
+  }).catch(($, e, next) => next(e)) // a failed check or offer never holds up the prompt
 
   // ---------- edits: the step where the conventional filler actually lands ----------
 
   on('tool.call', { tool: ['Edit', 'Write', 'NotebookEdit'] }, async ($, e, next) => {
     if (!loaded) await loadKernel($, true)
-    if (!patterns.length) return next(e)
 
-    let path = ''
+    // Checked before the tells, so a kernel written where there was none takes hold from the next request.
+    const path = e.tool === 'NotebookEdit' ? e.notebook_path : e.file_path
+    if (/(^|[\\/])KERNEL\.md$/i.test(path)) {
+      const ran = await next(e)
+      await loadKernel($, true)
+      return ran
+    }
+    if (!patterns.length) return next(e)
+    if (isExempt(path, await $.session.cwd())) return next(e)
+
     let added = ''
     let before = ''
     if (e.tool === 'Edit') {
-      path = e.file_path
       added = e.new_string
       before = e.old_string
     } else if (e.tool === 'Write') {
-      path = e.file_path
       added = e.content
       // A Write replaces the whole file, so what the file held is the replaced text.
       try {
@@ -254,14 +400,7 @@ export const register: Register = (on, options) => {
         // unreadable: judge the new content on its own
       }
     } else if (e.tool === 'NotebookEdit') {
-      path = e.notebook_path
       added = e.new_source
-    }
-
-    if (/(^|[\\/])KERNEL\.md$/i.test(path)) {
-      const ran = await next(e)
-      await loadKernel($, true)
-      return ran
     }
 
     // Only tells this edit introduces; one already in the replaced text is not new drift.
@@ -269,10 +408,10 @@ export const register: Register = (on, options) => {
     if (!hit) return next(e)
 
     const file = path.split(/[\\/]/).pop() ?? path
-    const flag: Flag = { id: hit.refusal.id, term: hit.tell, where: file, why: '', at: await $.clock.now() }
-    const instead = hit.refusal.instead ? ` Instead: ${hit.refusal.instead}.` : ''
+    const why = explain(hit.refusal, hit.tell, added, hit.re)
+    const flag: Flag = { id: hit.refusal.id, term: hit.tell, where: file, why, at: await $.clock.now() }
     const deny = {
-      deny: `Deviation kernel ${hit.refusal.id} refuses: ${hit.refusal.assumption}. This edit to ${file} brings in "${hit.tell}", which re-imposes it.${instead} Rework this part against the refusal. If this use genuinely does not touch the refusal, say why in one line and ask the user before trying again.`,
+      deny: `Deviation kernel ${hit.refusal.id}, in ${file}. ${why} Rework this part against the refusal. If this use genuinely does not touch the refusal, say why in one line and ask the user before trying again.`,
     }
 
     const current = mode()
@@ -293,7 +432,7 @@ export const register: Register = (on, options) => {
     let answer = 'Refuse it'
     try {
       answer = await $.ui.ask(
-        `Kernel ${flag.id} (refuses: ${hit.refusal.assumption}). Claude is writing "${flag.term}" into ${file}. Let it through?`,
+        `Kernel ${flag.id}, in ${file}. ${why} Let it through?`,
         { header: 'Kernel', options: ['Refuse it', 'Allow, on purpose'] },
       )
     } catch {
@@ -434,9 +573,10 @@ export const register: Register = (on, options) => {
       .map(r => `**${r.id}** ${r.assumption}${r.tells.length ? `  \n  tells: ${r.tells.join(', ')}` : ''}${r.instead ? `  \n  instead: ${r.instead}` : ''}`)
       .join('\n\n')
     const keeps = parsed.keeps.length ? `\n\n**Kept conventional:** ${parsed.keeps.join('; ')}` : ''
+    const exempt = parsed.exempt.length ? `\n\n**Exempt from the edit check:** ${parsed.exempt.join(', ')}` : ''
     const trips = log.length
-      ? `\n\n**Recent trips**\n\n${log.slice(-8).reverse().map(f => `- ${f.id} ${f.decision}: "${f.term}" in ${f.where}`).join('\n')}`
+      ? `\n\n**Recent trips**\n\n${log.slice(-8).reverse().map(f => `- ${f.id} ${f.decision}: "${f.term}" in ${f.where}${f.why ? `  \n  ${f.why}` : ''}`).join('\n')}`
       : ''
-    return Markdown({ key: 'kernel', text: `Mode: **${mode()}** · file: \`${kernelPath}\`\n\n${refusals}${keeps}${trips}` })
+    return Markdown({ key: 'kernel', text: `Mode: **${mode()}** · file: \`${kernelPath}\`\n\n${refusals}${keeps}${exempt}${trips}` })
   })
 }

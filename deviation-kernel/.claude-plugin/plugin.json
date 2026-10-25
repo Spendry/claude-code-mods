@@ -1,6 +1,6 @@
 {
   "name": "deviation-kernel",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Holds a project's refused assumptions in Claude's system prompt, flags edits and answers that re-impose them, and pauses on the step where it happens",
   "author": { "name": "Sam" },
   "types": "./types/index.d.ts",
@@ -16,6 +16,12 @@
       "type": "boolean",
       "title": "Semantic drift check",
       "description": "After each answer, a small model reads it against the kernel and flags conventional fillers the keyword tells miss.",
+      "default": true
+    },
+    "offerKernel": {
+      "type": "boolean",
+      "title": "Offer to write a kernel",
+      "description": "On the first prompt in a folder with no KERNEL.md, ask whether Claude should help you write one. Home folders and folders you said never for are skipped.",
       "default": true
     }
   }
