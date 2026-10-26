@@ -3,8 +3,9 @@ import type { Register } from 'claude-code'
 // Six agents: three that explore, and a lazy helper (a trogg) for each.
 const AGENTS = ['premise-breaker', 'field-crosser', 'idea-sizer', 'trogg-skip', 'trogg-borrow', 'trogg-poke']
 const AGENT_DIR = '.claude/agents'
-// The ideas folder: research/ideas/ in a project that keeps research apart, else ideas/.
-const IDEA_DIRS = ['research/ideas', 'ideas']
+// The ideas folder: .claude/agents/ideas/ where a project keeps its runs beside the agents,
+// research/ideas/ in a project that keeps research apart, else ideas/.
+const IDEA_DIRS = ['.claude/agents/ideas', 'research/ideas', 'ideas']
 
 const OFFER = { yes: 'Install them', later: 'Not this session', never: 'Never in this folder' }
 const TAILOR = { now: 'Yes, tailor them now', later: 'Later', keep: 'Keep them generic' }
@@ -14,7 +15,7 @@ const GUIDE = `<idea_agents>
 This project has six exploration agents in .claude/agents/: premise-breaker, field-crosser and idea-sizer, each with a lazy helper (trogg-skip, trogg-borrow, trogg-poke, on haiku). They propose and size ideas; they never edit project code. Use them when the person asks for a round on a problem, or when a goal is close but stuck and the person agrees to a round.
 
 A round, one folder per run:
-1. \`/ideas new <topic>\` makes <ideas>/<date>-<nn>-<topic>/ (the ideas folder is research/ideas/ where the project keeps research apart, else ideas/) with a run card (README.md) and 0-data.md. Fill 0-data.md first: the question, the current numbers with their sources, the rules (gates, KERNEL.md refusals), and which parts of the current method are choices rather than facts.
+1. \`/ideas new <topic>\` makes <ideas>/<date>-<nn>-<topic>/ (the ideas folder is .claude/agents/ideas/ where the project has it, research/ideas/ where the project keeps research apart, else ideas/) with a run card (README.md) and 0-data.md. Run files carry no frontmatter: Claude Code reads .md files under .claude/agents/ as agents. Fill 0-data.md first: the question, the current numbers with their sources, the rules (gates, KERNEL.md refusals), and which parts of the current method are choices rather than facts.
 2. Start premise-breaker and field-crosser together, each told the run folder. When each finishes, run its trogg on its file (trogg-skip on 1-premises.md, trogg-borrow on 2-fields.md). Subagents can't start subagents, so the main session runs every trogg.
 3. Send each upper agent its trogg's note and ask for the short revise step (same agent, so it keeps its context).
 4. Start idea-sizer on both files; give it a scratch folder for probes. Then trogg-poke on 3-sizing.md.
@@ -169,7 +170,7 @@ export const register: Register = (on, options) => {
       // dismissed: leave them generic for now
     }
     const notes = [
-      `[idea-agents] Installed ${wrote.join(', ')} into .claude/agents/ and ideas/README.md if it was missing. They load as agent types at the next session start; until then run them through the general-purpose agent told to follow each file. Mention this in one line, then answer the person's message.`,
+      `[idea-agents] Installed ${wrote.join(', ')} into .claude/agents/ and the ideas folder's README.md if it was missing. They load as agent types at the next session start; until then run them through the general-purpose agent told to follow each file. Mention this in one line, then answer the person's message.`,
     ]
     if (tailor === TAILOR.now) notes.push(TAILOR_NOTE + ' Do this after answering their message.')
     return next({ ...e, context: [...(e.context ?? []), ...notes] })

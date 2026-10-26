@@ -127,6 +127,13 @@ test('a project that keeps research apart gets its runs in research/ideas/', asy
   expect(Object.keys(seen.disk).some(k => k.startsWith('ideas/'))).toBe(false)
 })
 
+test('a project with .claude/agents/ideas/ gets its runs there, ahead of research/ideas/', async ($, on) => {
+  const seen = project(on, { files: { ...allSix(), '.claude/agents/ideas/README.md': '# Ideas', 'research/results/g0.json': '{}' } })
+  await $.command.run({ command: 'ideas', args: 'new handoff 02' })
+  expect(Object.keys(seen.disk).some(k => /^\.claude\/agents\/ideas\/\d{4}-\d\d-\d\d-01-handoff-02\/0-data\.md$/.test(k))).toBe(true)
+  expect(Object.keys(seen.disk).some(k => k.startsWith('research/ideas/') || k.startsWith('ideas/'))).toBe(false)
+})
+
 test('a slash command runs without the offer', async ($, on) => {
   const seen = project(on, { picks: ['Install them'] })
   await $.prompt.submit({ text: '/ideas', command: { name: 'ideas', args: '' }, ...TYPED })
